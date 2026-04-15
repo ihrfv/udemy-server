@@ -1,4 +1,4 @@
-use crate::http::Request;
+use crate::http::{Request, Response, StatusCode};
 use std::convert::TryFrom;
 use std::io::Read;
 use std::net::TcpListener;
@@ -30,6 +30,11 @@ impl Server {
                             match Request::try_from(&buffer[..]) {
                                 Ok(result) => {
                                     dbg!(result);
+                                    let response = Response::new(
+                                        StatusCode::Ok,
+                                        Some("<h1>Bongiorno!</h1>".to_string()),
+                                    );
+                                    let _ = response.send(&mut stream);
                                 }
                                 Err(error) => {
                                     println!("[ERROR] Failed to parse a request: {}", error)
