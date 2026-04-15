@@ -27,26 +27,29 @@ impl Server {
                                 "Received a request: {}. Bytes written: {bytes_written}",
                                 String::from_utf8_lossy(&buffer)
                             );
-                            match Request::try_from(&buffer[..]) {
+                            let response = match Request::try_from(&buffer[..]) {
                                 Ok(result) => {
                                     dbg!(result);
-                                    let response = Response::new(
+                                    Response::new(
                                         StatusCode::Ok,
                                         Some("<h1>Bongiorno!</h1>".to_string()),
-                                    );
-                                    let _ = response.send(&mut stream);
+                                    )
                                 }
                                 Err(error) => {
-                                    println!("[ERROR] Failed to parse a request: {}", error)
+                                    eprintln!("Failed to parse a request: {}", error);
+                                    Response::new(StatusCode::BadRequest, None)
                                 }
+                            };
+                            if let Err(error) = response.send(&mut stream) {
+                                eprintln!("Failed to send a response: {error}");
                             }
                         }
                         Err(error) => {
-                            println!("[ERROR] Failed to read from the connection: {}", error)
+                            eprintln!("Failed to read from the connection: {}", error)
                         }
                     }
                 }
-                Err(error) => println!("[ERROR] Failed to establish a connection: {}", error),
+                Err(error) => eprintln!("Failed to establish a connection: {}", error),
             }
         }
     }
