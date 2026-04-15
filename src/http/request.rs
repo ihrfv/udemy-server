@@ -43,7 +43,7 @@ fn get_next_word(s: &str) -> Option<(&str, &str)> {
     Some((&s[..i], &s[i + 1..]))
 }
 
-fn parse_path(path: &str) -> (&str, Option<QueryString>) {
+fn parse_path(path: &str) -> (&str, Option<QueryString<'_>>) {
     if let Some(i) = path.find('?') {
         return (&path[..i], Some(QueryString::from(&path[i + 1..])));
     }

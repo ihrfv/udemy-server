@@ -12,7 +12,7 @@ pub enum Value<'buf> {
 }
 
 impl<'buf> QueryString<'buf> {
-    pub fn get(&self, key: &str) -> Option<&Value> {
+    pub fn get(&self, key: &str) -> Option<&Value<'_>> {
         self.data.get(key)
     }
 }
