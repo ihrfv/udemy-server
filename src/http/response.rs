@@ -12,7 +12,10 @@ impl Response {
     pub fn new(status_code: StatusCode, body: Option<String>) -> Self {
         Response { status_code, body }
     }
-    pub fn send(&self, stream: &mut TcpStream) -> IoResult<()> {
+    pub fn send<T>(&self, stream: &mut T) -> IoResult<()>
+    where
+        T: Write,
+    {
         let body = match &self.body {
             Some(b) => b,
             None => "",
