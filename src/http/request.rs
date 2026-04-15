@@ -1,4 +1,6 @@
 use super::method::{Method, MethodError};
+use super::query_string::QueryString;
+
 use std::convert::{From, TryFrom};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
@@ -7,7 +9,7 @@ use std::str::Utf8Error;
 
 pub struct Request<'buf> {
     path: &'buf str,
-    query_string: Option<&'buf str>,
+    query_string: Option<QueryString<'buf>>,
     method: Method,
 }
 
@@ -40,9 +42,9 @@ fn get_next_word(s: &str) -> Option<(&str, &str)> {
     Some((&s[..i], &s[i + 1..]))
 }
 
-fn parse_path(path: &str) -> (&str, Option<&str>) {
+fn parse_path(path: &str) -> (&str, Option<QueryString>) {
     if let Some(i) = path.find('?') {
-        return (&path[..i], Some(&path[i + 1..]));
+        return (&path[..i], Some(QueryString::from(&path[i + 1..])));
     }
     (path, None)
 }

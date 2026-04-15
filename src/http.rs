@@ -5,4 +5,5 @@ pub use method::Method;
 pub use request::{ParseError, Request};
 
 mod method;
+mod query_string;
 mod request;
