@@ -1,3 +1,6 @@
+use std::thread;
+use std::time::Duration;
+
 use super::http::{Method, Request, Response, StatusCode};
 use super::server::Handler;
 
@@ -32,6 +35,10 @@ impl Handler for WebsiteHandler {
             Method::GET => match request.path() {
                 "/" => Response::new(StatusCode::Ok, self.read_file("index.html")),
                 "/hello" => Response::new(StatusCode::Ok, self.read_file("hello.html")),
+                "/sleep" => {
+                    thread::sleep(Duration::new(8, 0));
+                    Response::new(StatusCode::Ok, self.read_file("index.html"))
+                }
                 path => match self.read_file(path) {
                     Some(contents) => Response::new(StatusCode::Ok, Some(contents)),
                     None => Response::new(StatusCode::NotFound, None),
