@@ -1,10 +1,6 @@
-use server::Server;
 use std::env;
-use website_handler::WebsiteHandler;
-
-mod http;
-mod server;
-mod website_handler;
+use udemy_server::Server;
+use udemy_server::WebsiteHandler;
 
 fn main() {
     let defalut_public_path = format!("{}/public", env!("CARGO_MANIFEST_DIR"));
