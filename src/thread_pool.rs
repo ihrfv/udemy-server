@@ -1,5 +1,4 @@
-use std::sync::mpsc::{Receiver, Sender, channel};
-use std::sync::{Arc, Mutex};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use std::thread::{self, JoinHandle};
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
@@ -23,8 +22,7 @@ impl ThreadPool {
 
         let mut workers = Vec::with_capacity(capacity);
 
-        let (tx, rx) = channel();
-        let rx = Arc::new(Mutex::new(rx));
+        let (tx, rx) = unbounded();
 
         for i in 0..capacity {
             workers.push(Worker::new(i, rx.clone()));
@@ -65,12 +63,10 @@ struct Worker {
 }
 
 impl Worker {
-    fn new(id: usize, rx: Arc<Mutex<Receiver<Job>>>) -> Self {
+    fn new(id: usize, rx: Receiver<Job>) -> Self {
         let thread = thread::spawn(move || {
             loop {
-                let rx_guard = rx.lock().unwrap();
-                let worker_message = rx_guard.recv();
-                drop(rx_guard);
+                let worker_message = rx.recv();
                 match worker_message {
                     Ok(job) => {
                         println!("Worker {id} got a job; executing.");
