@@ -2,6 +2,8 @@ use crate::http::{ParseError, Request, Response, StatusCode};
 use std::convert::TryFrom;
 use std::io::Read;
 use std::net::{TcpListener, TcpStream};
+use std::sync::Arc;
+use std::thread;
 
 pub trait Handler {
     fn handle_request(&self, request: &Request) -> Response;
@@ -41,12 +43,20 @@ impl Server {
         Server { addr }
     }
 
-    pub fn run(&self, handler: impl Handler) {
+    pub fn run<HANDLER>(&self, handler: HANDLER)
+    where
+        HANDLER: Handler + Send + Sync + 'static,
+    {
         println!("Listening on {}", self.addr);
         let listener = TcpListener::bind(&self.addr).unwrap();
+        let handler = Arc::new(handler);
+
         loop {
             match listener.accept() {
-                Ok((mut stream, _)) => handler.handle_connection(&mut stream),
+                Ok((mut stream, _)) => {
+                    let handler = Arc::clone(&handler);
+                    thread::spawn(move || handler.handle_connection(&mut stream));
+                }
                 Err(error) => eprintln!("Failed to establish a connection: {}", error),
             }
         }
