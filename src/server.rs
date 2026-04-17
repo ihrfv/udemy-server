@@ -14,12 +14,11 @@ pub trait Handler {
     }
 
     fn handle_connection(&self, stream: &mut TcpStream) {
-        // TODO: update buffer to allow requests of arbitrary (reasonable) size
         let mut buffer = [0; 1024];
         match stream.read(&mut buffer) {
-            Ok(_bytes_written) => {
+            Ok(bytes_written) => {
                 println!("Received a request: {}", String::from_utf8_lossy(&buffer));
-                let response = match Request::try_from(&buffer[..]) {
+                let response = match Request::try_from(&buffer[..bytes_written]) {
                     Ok(request) => self.handle_request(&request),
                     Err(error) => self.handle_bad_request(&error),
                 };
