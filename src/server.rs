@@ -50,9 +50,10 @@ impl Server {
         println!("Listening on {}", self.addr);
         let listener = TcpListener::bind(&self.addr).unwrap();
         let handler = Arc::new(handler);
-        // TODO: update number of CPUs to correspond to the number of cores of the maching where the code
-        // is being executed
-        let thread_pool = ThreadPool::new(4);
+
+        let threads_capacity = std::thread::available_parallelism().map_or(1, |x| x.get());
+        println!("Threads to be in the pool {threads_capacity}");
+        let thread_pool = ThreadPool::new(threads_capacity);
         loop {
             match listener.accept() {
                 Ok((mut stream, _)) => {
