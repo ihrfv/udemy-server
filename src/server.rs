@@ -4,14 +4,14 @@ use std::io::Read;
 use std::net::{TcpListener, TcpStream};
 
 pub trait Handler {
-    fn handle_request(&mut self, request: &Request) -> Response;
+    fn handle_request(&self, request: &Request) -> Response;
 
-    fn handle_bad_request(&mut self, error: &ParseError) -> Response {
+    fn handle_bad_request(&self, error: &ParseError) -> Response {
         eprintln!("Failed to parse a request: {}", error);
         Response::new(StatusCode::BadRequest, None)
     }
 
-    fn handle_connection(&mut self, stream: &mut TcpStream) {
+    fn handle_connection(&self, stream: &mut TcpStream) {
         // TODO: update buffer to allow requests of arbitrary (reasonable) size
         let mut buffer = [0; 1024];
         match stream.read(&mut buffer) {
@@ -41,7 +41,7 @@ impl Server {
         Server { addr }
     }
 
-    pub fn run(&self, handler: &mut impl Handler) {
+    pub fn run(&self, handler: impl Handler) {
         println!("Listening on {}", self.addr);
         let listener = TcpListener::bind(&self.addr).unwrap();
         loop {
