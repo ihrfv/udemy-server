@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 #[derive(Debug)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Method {
     GET,
     DELETE,

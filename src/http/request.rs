@@ -64,6 +64,7 @@ fn parse_path(path: &str) -> (&str, Option<QueryString<'_>>) {
     (path, None)
 }
 
+#[allow(clippy::enum_variant_names)]
 pub enum ParseError {
     InvalidRequest,
     InvalidEncoding,
