@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 use std::thread::{self, JoinHandle};
 

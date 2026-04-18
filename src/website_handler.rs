@@ -1,8 +1,7 @@
-use std::thread;
-use std::time::Duration;
-
 use super::http::{Method, Request, Response, StatusCode};
 use super::server::Handler;
+use async_trait::async_trait;
+use tokio::time::{Duration, sleep};
 
 pub struct WebsiteHandler {
     public_path: String,
@@ -29,14 +28,15 @@ impl WebsiteHandler {
     }
 }
 
+#[async_trait]
 impl Handler for WebsiteHandler {
-    fn handle_request(&self, request: &Request) -> Response {
+    async fn handle_request(&self, request: &Request) -> Response {
         match request.method() {
             Method::GET => match request.path() {
                 "/" => Response::new(StatusCode::Ok, self.read_file("index.html")),
                 "/hello" => Response::new(StatusCode::Ok, self.read_file("hello.html")),
                 "/sleep" => {
-                    thread::sleep(Duration::new(8, 0));
+                    sleep(Duration::from_secs(5)).await;
                     Response::new(StatusCode::Ok, self.read_file("index.html"))
                 }
                 path => match self.read_file(path) {

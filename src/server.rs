@@ -1,28 +1,35 @@
-use crate::ThreadPool;
 use crate::http::{ParseError, Request, Response, StatusCode};
+use async_trait::async_trait;
 use std::convert::TryFrom;
-use std::io::Read;
-use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
+use tokio::io::AsyncReadExt;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::runtime::Runtime;
 
-pub trait Handler {
-    fn handle_request(&self, request: &Request) -> Response;
+#[async_trait]
+pub trait Handler: Send + Sync {
+    async fn handle_request(&self, request: &Request) -> Response;
 
     fn handle_bad_request(&self, error: &ParseError) -> Response {
         eprintln!("Failed to parse a request: {}", error);
         Response::new(StatusCode::BadRequest, None)
     }
 
-    fn handle_connection(&self, stream: &mut TcpStream) {
+    async fn handle_connection(&self, mut stream: TcpStream) {
         let mut buffer = [0; 1024];
-        match stream.read(&mut buffer) {
+        match stream.read(&mut buffer).await {
+            Ok(0) => {
+                // socket is closed
+                return;
+            }
             Ok(bytes_written) => {
                 println!("Received a request: {}", String::from_utf8_lossy(&buffer));
                 let response = match Request::try_from(&buffer[..bytes_written]) {
-                    Ok(request) => self.handle_request(&request),
+                    Ok(request) => self.handle_request(&request).await,
                     Err(error) => self.handle_bad_request(&error),
                 };
-                if let Err(error) = response.send(stream) {
+
+                if let Err(error) = response.send(&mut stream).await {
                     eprintln!("Failed to send a response: {error}");
                 }
             }
@@ -46,21 +53,24 @@ impl Server {
     where
         HANDLER: Handler + Send + Sync + 'static,
     {
-        println!("Listening on {}", self.addr);
-        let listener = TcpListener::bind(&self.addr).unwrap();
-        let handler = Arc::new(handler);
+        let runtime = Runtime::new().expect("Failed to create Tokio runtime");
 
-        let threads_capacity = std::thread::available_parallelism().map_or(1, |x| x.get());
-        println!("Threads to be in the pool {threads_capacity}");
-        let thread_pool = ThreadPool::new(threads_capacity);
-        loop {
-            match listener.accept() {
-                Ok((mut stream, _)) => {
-                    let handler = Arc::clone(&handler);
-                    thread_pool.execute(move || handler.handle_connection(&mut stream));
+        runtime.block_on(async {
+            println!("Listening on {}", self.addr);
+            let listener = TcpListener::bind(&self.addr).await.unwrap();
+            let handler = Arc::new(handler);
+
+            loop {
+                match listener.accept().await {
+                    Ok((stream, _)) => {
+                        let handler = Arc::clone(&handler);
+                        tokio::spawn(async move {
+                            handler.handle_connection(stream).await;
+                        });
+                    }
+                    Err(error) => eprintln!("Failed to establish a connection: {}", error),
                 }
-                Err(error) => eprintln!("Failed to establish a connection: {}", error),
             }
-        }
+        });
     }
 }
