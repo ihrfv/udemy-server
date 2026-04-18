@@ -4,7 +4,6 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::runtime::Runtime;
 
 #[async_trait]
 pub trait Handler: Send + Sync {
@@ -49,28 +48,24 @@ impl Server {
         Server { addr }
     }
 
-    pub fn run<HANDLER>(&self, handler: HANDLER)
+    pub async fn run<HANDLER>(&self, handler: HANDLER)
     where
         HANDLER: Handler + Send + Sync + 'static,
     {
-        let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+        println!("Listening on {}", self.addr);
+        let listener = TcpListener::bind(&self.addr).await.unwrap();
+        let handler = Arc::new(handler);
 
-        runtime.block_on(async {
-            println!("Listening on {}", self.addr);
-            let listener = TcpListener::bind(&self.addr).await.unwrap();
-            let handler = Arc::new(handler);
-
-            loop {
-                match listener.accept().await {
-                    Ok((stream, _)) => {
-                        let handler = Arc::clone(&handler);
-                        tokio::spawn(async move {
-                            handler.handle_connection(stream).await;
-                        });
-                    }
-                    Err(error) => eprintln!("Failed to establish a connection: {}", error),
+        loop {
+            match listener.accept().await {
+                Ok((stream, _)) => {
+                    let handler = Arc::clone(&handler);
+                    tokio::spawn(async move {
+                        handler.handle_connection(stream).await;
+                    });
                 }
+                Err(error) => eprintln!("Failed to establish a connection: {}", error),
             }
-        });
+        }
     }
 }
