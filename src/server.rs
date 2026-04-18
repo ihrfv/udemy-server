@@ -4,6 +4,8 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 
 #[async_trait]
 pub trait Handler: Send + Sync {
@@ -19,7 +21,6 @@ pub trait Handler: Send + Sync {
         match stream.read(&mut buffer).await {
             Ok(0) => {
                 // socket is closed
-                return;
             }
             Ok(bytes_written) => {
                 println!("Received a request: {}", String::from_utf8_lossy(&buffer));
@@ -48,24 +49,48 @@ impl Server {
         Server { addr }
     }
 
-    pub async fn run<HANDLER>(&self, handler: HANDLER)
-    where
+    pub async fn run<HANDLER>(
+        &self,
+        handler: HANDLER,
+        mut shutdown: tokio::sync::watch::Receiver<()>,
+    ) where
         HANDLER: Handler + Send + Sync + 'static,
     {
         println!("Listening on {}", self.addr);
         let listener = TcpListener::bind(&self.addr).await.unwrap();
         let handler = Arc::new(handler);
-
+        let cancelation_token = CancellationToken::new();
+        let task_tracker = TaskTracker::new();
         loop {
-            match listener.accept().await {
-                Ok((stream, _)) => {
-                    let handler = Arc::clone(&handler);
-                    tokio::spawn(async move {
-                        handler.handle_connection(stream).await;
-                    });
+            tokio::select! {
+                res = listener.accept() => {
+                    match res {
+                        Ok((stream, _)) => {
+                            let handler = Arc::clone(&handler);
+                            let token = cancelation_token.clone();
+                            task_tracker.spawn(async move {
+                                // There is a need to use cancelation_token becase some connections
+                                // can be kept alive with a keep_alive message and therefore the
+                                // spawned task would never end
+                                tokio::select! {
+                                    _ = handler.handle_connection(stream) => {}
+                                    _ = token.cancelled() => {
+                                        // TODO: improve shutdown notification
+                                    }
+                                }
+                            });
+                        }
+                        Err(error) => eprintln!("Failed to establish a connection: {}", error),
+                    }
                 }
-                Err(error) => eprintln!("Failed to establish a connection: {}", error),
+                _ = shutdown.changed() => break,
             }
         }
+
+        cancelation_token.cancel();
+        println!("Waiting for every task to finish");
+        task_tracker.close();
+        task_tracker.wait().await;
+        println!("Server stopped.");
     }
 }
